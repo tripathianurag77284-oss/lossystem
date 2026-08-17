@@ -14,11 +14,11 @@
     </parent>
 
     <groupId>com.los</groupId>
-    <artifactId>salesservice</artifactId>
+    <artifactId>applicationservice</artifactId>
     <version>0.0.1-SNAPSHOT</version>
 
-    <name>salesservice</name>
-    <description>LOS Sales Service</description>
+    <name>applicationservice</name>
+    <description>LOS application Service</description>
     <properties>
         <java.version>21</java.version>
     </properties>
