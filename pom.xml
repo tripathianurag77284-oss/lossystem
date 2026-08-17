@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         https://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- ===================================================== -->
+    <!-- SPRING BOOT PARENT                                    -->
+    <!-- ===================================================== -->
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>4.1.0</version>
+        <relativePath/>
+    </parent>
+
+
+    <!-- ===================================================== -->
+    <!-- PROJECT INFORMATION                                   -->
+    <!-- ===================================================== -->
+
+    <groupId>com.los</groupId>
+    <artifactId>lossystem</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+
+    <!-- IMPORTANT: This is a Maven parent/aggregator -->
+    <packaging>pom</packaging>
+
+    <name>lossystem</name>
+    <description>LOS Platform - Multi Module Project</description>
+
+
+    <!-- ===================================================== -->
+    <!-- PROPERTIES                                            -->
+    <!-- ===================================================== -->
+
+    <properties>
+
+        <java.version>21</java.version>
+
+        <!-- Spring Cloud -->
+        <spring-cloud.version>2025.1.2</spring-cloud.version>
+
+        <!-- JJWT -->
+        <jjwt.version>0.12.6</jjwt.version>
+
+        <!-- SpringDoc -->
+        <springdoc.version>3.0.3</springdoc.version>
+
+    </properties>
+
+
+    <!-- ===================================================== -->
+    <!-- MODULES                                               -->
+    <!-- ===================================================== -->
+
+    <modules>
+
+        <module>apigateway</module>
+        <module>authservice</module>
+        <module>salesservice</module>
+
+    </modules>
+
+
+    <!-- ===================================================== -->
+    <!-- DEPENDENCY MANAGEMENT                                  -->
+    <!-- ===================================================== -->
+
+    <dependencyManagement>
+
+        <dependencies>
+
+            <!-- ============================================= -->
+            <!-- Spring Cloud BOM                              -->
+            <!-- ============================================= -->
+
+            <dependency>
+                <groupId>org.springframework.cloud</groupId>
+                <artifactId>spring-cloud-dependencies</artifactId>
+                <version>${spring-cloud.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+
+            <!-- ============================================= -->
+            <!-- JJWT                                           -->
+            <!-- ============================================= -->
+
+            <dependency>
+                <groupId>io.jsonwebtoken</groupId>
+                <artifactId>jjwt-api</artifactId>
+                <version>${jjwt.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>io.jsonwebtoken</groupId>
+                <artifactId>jjwt-impl</artifactId>
+                <version>${jjwt.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>io.jsonwebtoken</groupId>
+                <artifactId>jjwt-jackson</artifactId>
+                <version>${jjwt.version}</version>
+            </dependency>
+
+
+            <!-- ============================================= -->
+            <!-- SpringDoc / OpenAPI                            -->
+            <!-- ============================================= -->
+
+            <dependency>
+                <groupId>org.springdoc</groupId>
+                <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+                <version>${springdoc.version}</version>
+            </dependency>
+
+        </dependencies>
+
+    </dependencyManagement>
+
+
+    <!-- ===================================================== -->
+    <!-- COMMON DEPENDENCIES                                   -->
+    <!-- ===================================================== -->
+
+    <dependencies>
+
+        <!-- Lombok - common to all services -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+    </dependencies>
+
+
+</project>
