@@ -1,0 +1,6 @@
+#FileLock
+#Tue Aug 18 14:09:16 IST 2026
+hostName=LENOVO
+id=1a014065ce925f2db55c4ce5dbcea8d5f3609b07f10
+method=file
+server=192.168.1.111\:61080
