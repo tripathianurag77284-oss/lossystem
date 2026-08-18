@@ -62,6 +62,7 @@
         <module>apigateway</module>
         <module>authservice</module>
         <module>applicationservice</module>
+        <module>documentservice</module>
 
     </modules>
 
