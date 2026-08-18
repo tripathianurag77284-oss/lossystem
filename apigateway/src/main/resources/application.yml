@@ -17,6 +17,11 @@ spring:
               predicates:
                 - Path=/api/applications/**
 
+            - id: documentservice
+              uri: http://localhost:8083
+              predicates:
+                - Path=/api/documents/**,/api/document-types/**
+
 server:
   port: 8080
 
