@@ -10,7 +10,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class LeadAssignmentRequest {
-    
+
     @NotBlank(message = "Assigned task is required")
     private String assignedForTaskId;
 
