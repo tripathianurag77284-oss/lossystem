@@ -1,35 +1,28 @@
-package com.los.authservice.model;
+package com.los.applicationservice.model;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class User {
+public class TaskStageMaster {
 
-    private Long userId;
+    private Long taskStageId;
 
-    private String mobile;
+    private String stageName;
 
-    private String email;
+    private BigDecimal progress;
 
-    private String username;
+    private LocalDateTime deadline;
 
-    private String password;
-
-    private String role;
-
-    private String permissions;
-
-    private Boolean isMobileVerified;
-
-    private Boolean isEmailVerified;
+    private LocalDateTime expectedSubmission;
 
     private Boolean isActive;
 
@@ -37,5 +30,10 @@ public class User {
 
     private LocalDateTime modifiedAt;
 
+    private Long createdById;
+
+    private Long modifiedById;
+
     private Boolean isDeleted;
 }
+

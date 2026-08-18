@@ -12,7 +12,7 @@ spring:
               predicates:
                 - Path=/api/auth/**
 
-            - id: salesservice
+            - id: applicationservice
               uri: http://localhost:8082
               predicates:
                 - Path=/api/applications/**
