@@ -2,7 +2,10 @@ package com.los.documentservice.controller;
 
 import com.los.documentservice.dto.DocumentRequest;
 import com.los.documentservice.dto.DocumentResponse;
+import com.los.documentservice.dto.DocumentTypeMasterRequest;
+import com.los.documentservice.dto.DocumentTypeMasterResponse;
 import com.los.documentservice.service.DocumentService;
+import com.los.documentservice.service.DocumentTypeMasterService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -12,42 +15,77 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/documents")
 public class DocumentController {
 
     private final DocumentService documentService;
+    private final DocumentTypeMasterService documentTypeMasterService;
 
-    public DocumentController(DocumentService documentService) {
+    public DocumentController(DocumentService documentService,
+                              DocumentTypeMasterService documentTypeMasterService) {
         this.documentService = documentService;
+        this.documentTypeMasterService = documentTypeMasterService;
     }
 
-    @GetMapping
+    @GetMapping("/")
+    public String home() {
+        return "redirect:/swagger-ui.html";
+    }
+
+    @GetMapping("/api/documents")
     public List<DocumentResponse> getAllDocuments() {
         return documentService.getAllDocuments();
     }
 
-    @GetMapping("/{documentId}")
+    @GetMapping("/api/documents/{documentId}")
     public DocumentResponse getDocumentById(@PathVariable Long documentId) {
         return documentService.getDocumentById(documentId);
     }
 
-    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PostMapping(value = "/api/documents", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
     public DocumentResponse createDocument(@Valid @RequestPart("document") DocumentRequest request,
                                            @RequestPart("file") MultipartFile file) {
         return documentService.createDocument(request, file);
     }
 
-    @PutMapping(value = "/{documentId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PutMapping(value = "/api/documents/{documentId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public DocumentResponse updateDocument(@PathVariable Long documentId,
                                            @Valid @RequestPart("document") DocumentRequest request,
                                            @RequestPart("file") MultipartFile file) {
         return documentService.updateDocument(documentId, request, file);
     }
 
-    @DeleteMapping("/{documentId}")
+    @DeleteMapping("/api/documents/{documentId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteDocument(@PathVariable Long documentId) {
         documentService.deleteDocument(documentId);
+    }
+
+    @GetMapping("/api/document-types")
+    public List<DocumentTypeMasterResponse> getAllDocumentTypes() {
+        return documentTypeMasterService.getAllDocumentTypes();
+    }
+
+    @GetMapping("/api/document-types/{documentTypeId}")
+    public DocumentTypeMasterResponse getDocumentTypeById(@PathVariable Long documentTypeId) {
+        return documentTypeMasterService.getDocumentTypeById(documentTypeId);
+    }
+
+    @PostMapping("/api/document-types")
+    @ResponseStatus(HttpStatus.CREATED)
+    public DocumentTypeMasterResponse createDocumentType(@Valid @RequestBody DocumentTypeMasterRequest request) {
+        return documentTypeMasterService.createDocumentType(request);
+    }
+
+    @PutMapping("/api/document-types/{documentTypeId}")
+    public DocumentTypeMasterResponse updateDocumentType(@PathVariable Long documentTypeId,
+                                                         @Valid @RequestBody DocumentTypeMasterRequest request) {
+        return documentTypeMasterService.updateDocumentType(documentTypeId, request);
+    }
+
+    @DeleteMapping("/api/document-types/{documentTypeId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteDocumentType(@PathVariable Long documentTypeId) {
+        documentTypeMasterService.deleteDocumentType(documentTypeId);
     }
 }
