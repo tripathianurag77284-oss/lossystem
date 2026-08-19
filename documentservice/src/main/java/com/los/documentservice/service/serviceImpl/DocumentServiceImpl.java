@@ -41,40 +41,92 @@ public class DocumentServiceImpl implements DocumentService {
 
     @Override
     @Transactional
-    public DocumentResponse createDocument(DocumentRequest request, MultipartFile file) {
+    public DocumentResponse createDocument(
+            DocumentRequest request,
+            MultipartFile file) {
+
         String storedPath = fileStorageService.store(file);
-        Document document = new Document();
-        document.setApplicantId(request.getApplicantId());
-        document.setDocumentTypeId(request.getDocumentTypeId());
-        document.setUploadStage(request.getUploadStage());
-        document.setFileUrl(storedPath);
-        document.setVerifiedFlag(request.getVerifiedFlag());
-        document.setVerificationRemark(request.getVerificationRemark());
-        document.setVerificationStatus(request.getVerificationStatus());
-        document.setVerificationMode(request.getVerificationMode());
-        document.setValidatedFlag(request.getValidatedFlag());
-        document.setValidationRemark(request.getValidationRemark());
-        document.setValidationStatus(request.getValidationStatus());
-        document.setValidationMode(request.getValidationMode());
-        document.setIsActive(request.getIsActive());
-        document.setCreatedAt(LocalDateTime.now());
-        document.setModifiedAt(LocalDateTime.now());
-        document.setVerifiedAt(Boolean.TRUE.equals(request.getVerifiedFlag()) ? LocalDateTime.now() : null);
-        document.setValidatedAt(Boolean.TRUE.equals(request.getValidatedFlag()) ? LocalDateTime.now() : null);
-        document.setCreatedBy(request.getCreatedBy());
-        document.setModifiedBy(request.getModifiedBy());
-        document.setVerifiedBy(request.getVerifiedBy());
-        document.setValidatedBy(request.getValidatedBy());
-        document.setIsDeleted(false);
 
         try {
-            return mapToResponse(documentRepository.save(document));
+            Document document = new Document();
+
+            // Request data
+            document.setApplicantId(request.getApplicantId());
+            document.setDocumentTypeId(request.getDocumentTypeId());
+            document.setUploadStage(request.getUploadStage());
+
+            // File information
+            document.setFileUrl(storedPath);
+
+            // Verification information
+            document.setVerifiedFlag(
+                    Boolean.TRUE.equals(request.getVerifiedFlag())
+            );
+
+            document.setVerificationMethod(
+                    request.getVerificationMethod()
+            );
+
+            document.setVerificationRemark(
+                    request.getVerificationRemark()
+            );
+
+            document.setVerificationStatus(
+                    request.getVerificationStatus()
+            );
+
+            document.setVerificationMode(
+                    request.getVerificationMode()
+            );
+
+            // Active / deleted flags
+            document.setIsActive(
+                    request.getIsActive() != null
+                            ? request.getIsActive()
+                            : true
+            );
+
+            document.setIsDeleted(false);
+
+            // Audit fields
+            LocalDateTime now = LocalDateTime.now();
+
+            document.setCreatedAt(now);
+            document.setModifiedAt(now);
+
+            document.setCreatedBy(
+                    request.getCreatedBy()
+            );
+
+            document.setModifiedBy(
+                    request.getModifiedBy()
+            );
+
+            // Verification audit
+            if (Boolean.TRUE.equals(request.getVerifiedFlag())) {
+                document.setVerifiedAt(now);
+                document.setVerifiedBy(
+                        request.getVerifiedBy()
+                );
+            } else {
+                document.setVerifiedAt(null);
+                document.setVerifiedBy(null);
+            }
+
+            // Save document
+            Document savedDocument =
+                    documentRepository.save(document);
+
+            return mapToResponse(savedDocument);
+
         } catch (RuntimeException exception) {
+
+            // If DB save fails, remove uploaded file
             fileStorageService.delete(storedPath);
+
             throw exception;
         }
     }
-
     @Override
     @Transactional
     public DocumentResponse updateDocument(Long documentId, DocumentRequest request, MultipartFile file) {

@@ -42,4 +42,5 @@ public class DocumentRequest {
     private Long modifiedBy;
     private Long verifiedBy;
     private Long validatedBy;
+    private String verificationMethod;
 }
