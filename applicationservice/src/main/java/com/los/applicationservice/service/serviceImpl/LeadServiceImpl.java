@@ -215,7 +215,8 @@ public class LeadServiceImpl implements LeadService {
                 );
 
 
-        kafkaProducerService.sendLeadCreatedEvent(
+        kafkaProducerService.sendLeadCreated(
+                lead.getLeadId(),
                 event
         );
 
@@ -395,7 +396,8 @@ public class LeadServiceImpl implements LeadService {
 
 
         kafkaProducerService
-                .sendLeadCreatedEvent(
+                .sendLeadCreated(
+                        lead.getLeadId(),
                         event
                 );
 

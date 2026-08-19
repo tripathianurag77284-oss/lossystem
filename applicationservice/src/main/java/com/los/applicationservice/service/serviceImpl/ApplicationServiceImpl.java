@@ -3,18 +3,23 @@ package com.los.applicationservice.service.serviceImpl;
 import com.los.applicationservice.dto.*;
 import com.los.applicationservice.exception.ApplicationNotFoundException;
 import com.los.applicationservice.kafka.KafkaProducerService;
+import com.los.applicationservice.kafka.event.ApplicationAssignmentCreatedEvent;
+import com.los.applicationservice.kafka.event.ApplicationAssignmentStatusChangedEvent;
 import com.los.applicationservice.kafka.event.ApplicationCreatedEvent;
 import com.los.applicationservice.kafka.event.ApplicationStatusChangedEvent;
 import com.los.applicationservice.mock.*;
 import com.los.applicationservice.model.*;
 import com.los.applicationservice.service.ApplicationService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 
 @Service
+@RequiredArgsConstructor
 public class ApplicationServiceImpl implements ApplicationService {
 
     private final List<Application> applications =
@@ -22,15 +27,6 @@ public class ApplicationServiceImpl implements ApplicationService {
 
     private final KafkaProducerService kafkaProducerService;
 
-    // =========================================================
-    // CONSTRUCTOR
-    // =========================================================
-
-    public ApplicationServiceImpl(
-            KafkaProducerService kafkaProducerService) {
-
-        this.kafkaProducerService = kafkaProducerService;
-    }
 
     // =========================================================
     // GET ALL APPLICATIONS
@@ -43,6 +39,7 @@ public class ApplicationServiceImpl implements ApplicationService {
                 .map(this::mapToResponse)
                 .toList();
     }
+
 
     // =========================================================
     // GET APPLICATION BY ID
@@ -58,6 +55,7 @@ public class ApplicationServiceImpl implements ApplicationService {
         return mapToResponse(application);
     }
 
+
     // =========================================================
     // CREATE APPLICATION
     // =========================================================
@@ -70,6 +68,8 @@ public class ApplicationServiceImpl implements ApplicationService {
                 .mapToLong(Application::getApplicationId)
                 .max()
                 .orElse(5000L) + 1;
+
+        LocalDateTime now = LocalDateTime.now();
 
         Application application = new Application();
 
@@ -111,19 +111,15 @@ public class ApplicationServiceImpl implements ApplicationService {
                 request.getDescription()
         );
 
-        application.setCreatedAt(
-                LocalDateTime.now()
-        );
+        application.setCreatedAt(now);
+        application.setModifiedAt(now);
 
-        application.setModifiedAt(
-                LocalDateTime.now()
-        );
-
-        // Add to mock list
+        // Add application to mock data
         applications.add(application);
 
+
         // =====================================================
-        // SEND KAFKA EVENT
+        // KAFKA - APPLICATION CREATED
         // =====================================================
 
         ApplicationCreatedEvent event =
@@ -140,12 +136,12 @@ public class ApplicationServiceImpl implements ApplicationService {
                         application.getCreatedAt()
                 );
 
-        kafkaProducerService.sendApplicationCreatedEvent(
-                event
-        );
+        kafkaProducerService.sendApplicationCreatedEvent(event);
+
 
         return mapToResponse(application);
     }
+
 
     // =========================================================
     // UPDATE APPLICATION
@@ -194,6 +190,7 @@ public class ApplicationServiceImpl implements ApplicationService {
         return mapToResponse(application);
     }
 
+
     // =========================================================
     // DELETE APPLICATION
     // =========================================================
@@ -208,6 +205,7 @@ public class ApplicationServiceImpl implements ApplicationService {
         applications.remove(application);
     }
 
+
     // =========================================================
     // UPDATE APPLICATION STATUS
     // =========================================================
@@ -220,25 +218,26 @@ public class ApplicationServiceImpl implements ApplicationService {
         Application application =
                 findApplication(applicationId);
 
-        // Store old status
         ApplicationStatus oldStatus =
                 application.getStatus();
 
-        // New status
         ApplicationStatus newStatus =
                 request.getStatus();
 
-        // Update status
-        application.setStatus(
-                newStatus
-        );
+        // No status change
+        if (oldStatus == newStatus) {
+            return mapToResponse(application);
+        }
+
+        application.setStatus(newStatus);
 
         application.setModifiedAt(
                 LocalDateTime.now()
         );
 
+
         // =====================================================
-        // SEND STATUS CHANGE EVENT
+        // KAFKA - APPLICATION STATUS CHANGED
         // =====================================================
 
         ApplicationStatusChangedEvent event =
@@ -250,11 +249,14 @@ public class ApplicationServiceImpl implements ApplicationService {
                         application.getModifiedAt()
                 );
 
-        kafkaProducerService
-                .sendApplicationStatusChangedEvent(event);
+        kafkaProducerService.sendApplicationStatusChangedEvent(
+                event
+        );
+
 
         return mapToResponse(application);
     }
+
 
     // =========================================================
     // GET ALL LOAN PRODUCTS
@@ -267,33 +269,37 @@ public class ApplicationServiceImpl implements ApplicationService {
                 .stream()
                 .filter(product ->
                         Boolean.TRUE.equals(product.getIsActive())
-                                && !Boolean.TRUE.equals(product.getIsDeleted()))
+                                && !Boolean.TRUE.equals(
+                                product.getIsDeleted()))
                 .map(this::toResponse)
                 .toList();
     }
+
+
     // =========================================================
-    // GET LOAN PRODUCTS BY ID
+    // GET LOAN PRODUCT BY ID
     // =========================================================
 
     @Override
-    public LoanProductResponse getLoanProductById(Long productId) {
+    public LoanProductResponse getLoanProductById(
+            Long productId) {
 
         LoanProduct product =
                 LoanProductMockData.getLoanProducts()
                         .stream()
-                        .filter(p ->
-                                p.getProductId().equals(productId))
+                        .filter(product1 ->
+                                product1.getProductId()
+                                        .equals(productId))
                         .findFirst()
                         .orElseThrow(() ->
                                 new RuntimeException(
                                         "Loan product not found: "
                                                 + productId
-                                ));
+                                )
+                        );
 
         return toResponse(product);
     }
-
-
 
 
     // =========================================================
@@ -331,30 +337,350 @@ public class ApplicationServiceImpl implements ApplicationService {
         return mapToResponse(application);
     }
 
+
     // =========================================================
     // RESUME APPLICATION
     // =========================================================
 
     @Override
-    public ApplicationResponse resumeApplication(Long applicationId) {
+    public ApplicationResponse resumeApplication(
+            Long applicationId) {
 
-        Application application = findApplication(applicationId);
+        Application application =
+                findApplication(applicationId);
 
-        // Only DRAFT applications can be resumed
-        if (application.getStatus() != ApplicationStatus.DRAFT) {
+        ApplicationStatus oldStatus =
+                application.getStatus();
+
+        // Only DRAFT can be resumed
+        if (oldStatus != ApplicationStatus.DRAFT) {
+
             throw new RuntimeException(
                     "Only DRAFT applications can be resumed"
             );
         }
 
-        // Change status
-        application.setStatus(ApplicationStatus.IN_PROGRESS);
+        ApplicationStatus newStatus =
+                ApplicationStatus.IN_PROGRESS;
 
-        // Update modification time
-        application.setModifiedAt(LocalDateTime.now());
+        application.setStatus(newStatus);
+
+        application.setModifiedAt(
+                LocalDateTime.now()
+        );
+
+
+        // =====================================================
+        // KAFKA - APPLICATION STATUS CHANGED
+        // =====================================================
+
+        ApplicationStatusChangedEvent event =
+                new ApplicationStatusChangedEvent(
+                        application.getApplicationId(),
+                        application.getLeadId(),
+                        oldStatus,
+                        newStatus,
+                        application.getModifiedAt()
+                );
+
+        kafkaProducerService.sendApplicationStatusChangedEvent(
+                event
+        );
+
 
         return mapToResponse(application);
     }
+
+
+    // =========================================================
+    // GET ALL TASKS
+    // =========================================================
+
+    @Override
+    public List<TaskMasterResponse> getAllTasks() {
+
+        return TaskMockData.getTasks()
+                .stream()
+                .map(this::mapToResponse)
+                .toList();
+    }
+
+
+    // =========================================================
+    // GET TASK BY ID
+    // =========================================================
+
+    @Override
+    public TaskMasterResponse getTaskById(
+            Long taskId) {
+
+        TaskMaster task =
+                TaskMockData.getTasks()
+                        .stream()
+                        .filter(t ->
+                                t.getTaskId()
+                                        .equals(taskId))
+                        .findFirst()
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "Task not found: "
+                                                + taskId
+                                )
+                        );
+
+        return mapToResponse(task);
+    }
+
+
+    // =========================================================
+    // GET ALL TASK STAGES
+    // =========================================================
+
+    @Override
+    public List<TaskStageMasterResponse> getAllTaskStages() {
+
+        return TaskStageMockData.getStages()
+                .stream()
+                .map(this::mapToResponse)
+                .toList();
+    }
+
+
+    // =========================================================
+    // GET TASK STAGE BY ID
+    // =========================================================
+
+    @Override
+    public TaskStageMasterResponse getTaskStageById(
+            Long taskStageId) {
+
+        TaskStageMaster stage =
+                TaskStageMockData.getStages()
+                        .stream()
+                        .filter(s ->
+                                s.getTaskStageId()
+                                        .equals(taskStageId))
+                        .findFirst()
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "Task stage not found: "
+                                                + taskStageId
+                                )
+                        );
+
+        return mapToResponse(stage);
+    }
+
+
+    // =========================================================
+    // GET ASSIGNMENTS BY APPLICATION ID
+    // =========================================================
+
+    @Override
+    public List<ApplicationAssignmentResponse>
+    getAssignmentsByApplicationId(
+            Long applicationId) {
+
+        // Verify application exists
+        findApplication(applicationId);
+
+        return ApplicationAssignmentMockData
+                .getAssignments()
+                .stream()
+                .filter(assignment ->
+                        assignment.getApplicationId()
+                                .equals(applicationId))
+                .map(this::mapToResponse)
+                .toList();
+    }
+
+
+    // =========================================================
+    // GET APPLICATION ASSIGNMENT BY ID
+    // =========================================================
+
+    @Override
+    public ApplicationAssignmentResponse
+    getAssignmentById(
+            Long assignmentId) {
+
+        ApplicationAssignment assignment =
+                findAssignment(assignmentId);
+
+        return mapToResponse(assignment);
+    }
+
+
+    // =========================================================
+    // CREATE APPLICATION ASSIGNMENT
+    // =========================================================
+
+    @Override
+    public ApplicationAssignmentResponse createAssignment(
+            Long applicationId,
+            ApplicationAssignmentRequest request) {
+
+        // Verify application exists
+        findApplication(applicationId);
+
+        long newId =
+                ApplicationAssignmentMockData
+                        .getAssignments()
+                        .stream()
+                        .mapToLong(
+                                ApplicationAssignment::getAssignmentId)
+                        .max()
+                        .orElse(5000L) + 1;
+
+        LocalDateTime now =
+                LocalDateTime.now();
+
+        ApplicationAssignment assignment =
+                new ApplicationAssignment();
+
+        assignment.setAssignmentId(newId);
+
+        assignment.setApplicationId(
+                applicationId
+        );
+
+        assignment.setAssignedForTaskId(
+                request.getAssignedForTaskId()
+        );
+
+        assignment.setTaskStageId(
+                request.getTaskStageId()
+        );
+
+        assignment.setAssignmentStatus(
+                request.getAssignmentStatus() != null
+                        ? request.getAssignmentStatus()
+                        : "ASSIGNED"
+        );
+
+        assignment.setAssignmentRemark(
+                request.getAssignmentRemark()
+        );
+
+        assignment.setProceedToUserId(
+                request.getProceedToUserId()
+        );
+
+        assignment.setIsTerminal(
+                request.getIsTerminal() != null
+                        ? request.getIsTerminal()
+                        : false
+        );
+
+        assignment.setTotalProgress(
+                BigDecimal.ZERO
+        );
+
+        assignment.setIsActive(true);
+        assignment.setCreatedAt(now);
+        assignment.setModifiedAt(now);
+
+        assignment.setCreatedById(101L);
+        assignment.setModifiedById(101L);
+
+        assignment.setIsDeleted(false);
+
+
+        // Add to mock data
+        ApplicationAssignmentMockData
+                .getAssignments()
+                .add(assignment);
+
+
+        // =====================================================
+        // KAFKA - APPLICATION ASSIGNMENT CREATED
+        // =====================================================
+
+        ApplicationAssignmentCreatedEvent event =
+                new ApplicationAssignmentCreatedEvent(
+                        assignment.getAssignmentId(),
+                        assignment.getApplicationId(),
+                        assignment.getAssignedForTaskId(),
+                        assignment.getTaskStageId(),
+                        assignment.getAssignmentStatus(),
+                        assignment.getProceedToUserId(),
+                        assignment.getCreatedAt()
+                );
+
+        kafkaProducerService
+                .sendApplicationAssignmentCreated(event);
+
+
+        return mapToResponse(assignment);
+    }
+
+
+    // =========================================================
+    // UPDATE APPLICATION ASSIGNMENT STATUS
+    // =========================================================
+
+    @Override
+    public ApplicationAssignmentResponse
+    updateAssignmentStatus(
+            Long assignmentId,
+            AssignmentStatusUpdateRequest request) {
+
+        ApplicationAssignment assignment =
+                findAssignment(assignmentId);
+
+        String oldStatus =
+                assignment.getAssignmentStatus();
+
+        String newStatus =
+                request.getStatus();
+
+
+        // No status change
+        if (Objects.equals(oldStatus, newStatus)) {
+
+            if (request.getRemark() != null) {
+                assignment.setAssignmentRemark(
+                        request.getRemark()
+                );
+            }
+
+            return mapToResponse(assignment);
+        }
+
+
+        assignment.setAssignmentStatus(newStatus);
+
+        if (request.getRemark() != null) {
+            assignment.setAssignmentRemark(
+                    request.getRemark()
+            );
+        }
+
+        assignment.setModifiedAt(
+                LocalDateTime.now()
+        );
+
+
+        // =====================================================
+        // KAFKA - ASSIGNMENT STATUS CHANGED
+        // =====================================================
+
+        ApplicationAssignmentStatusChangedEvent event =
+                new ApplicationAssignmentStatusChangedEvent(
+                        assignment.getAssignmentId(),
+                        assignment.getApplicationId(),
+                        oldStatus,
+                        newStatus,
+                        assignment.getModifiedAt()
+                );
+
+        kafkaProducerService
+                .sendApplicationAssignmentStatusChanged(event);
+
+
+        return mapToResponse(assignment);
+    }
+
 
     // =========================================================
     // FIND APPLICATION
@@ -377,40 +703,31 @@ public class ApplicationServiceImpl implements ApplicationService {
     }
 
 
-    @Override
-    public List<TaskMasterResponse> getAllTasks() {
-        return TaskMockData.getTasks() .stream()
-                .map(this::mapToResponse) .toList();
+    // =========================================================
+    // FIND ASSIGNMENT
+    // =========================================================
+
+    private ApplicationAssignment findAssignment(
+            Long assignmentId) {
+
+        return ApplicationAssignmentMockData
+                .getAssignments()
+                .stream()
+                .filter(assignment ->
+                        assignment.getAssignmentId()
+                                .equals(assignmentId))
+                .findFirst()
+                .orElseThrow(() ->
+                        new RuntimeException(
+                                "Application assignment not found: "
+                                        + assignmentId
+                        )
+                );
     }
-
-    @Override
-    public TaskMasterResponse getTaskById(Long taskId) {
-        TaskMaster task = TaskMockData.getTasks() .stream()
-                .filter(t -> t.getTaskId().equals(taskId))
-                .findFirst() .orElseThrow(() -> new RuntimeException( "Task not found: " + taskId ) );
-        return mapToResponse(task);
-    }
-
-    @Override
-    public List<TaskStageMasterResponse> getAllTaskStages() {
-        return TaskStageMockData.getStages() .stream()
-                .map(this::mapToResponse) .toList();
-    }
-
-
-    @Override
-    public TaskStageMasterResponse getTaskStageById( Long taskStageId) {
-        TaskStageMaster stage = TaskStageMockData.getStages() .stream()
-                .filter(s -> s.getTaskStageId()
-                        .equals(taskStageId)) .findFirst()
-                .orElseThrow(() -> new RuntimeException( "Task stage not found: " + taskStageId ) );
-        return mapToResponse(stage);
-    }
-
 
 
     // =========================================================
-    // ENTITY -> RESPONSE
+    // APPLICATION -> RESPONSE
     // =========================================================
 
     private ApplicationResponse mapToResponse(
@@ -432,6 +749,11 @@ public class ApplicationServiceImpl implements ApplicationService {
         );
     }
 
+
+    // =========================================================
+    // LOAN PRODUCT -> RESPONSE
+    // =========================================================
+
     private LoanProductResponse toResponse(
             LoanProduct product) {
 
@@ -450,57 +772,14 @@ public class ApplicationServiceImpl implements ApplicationService {
         );
     }
 
-    @Override
-    public List<ApplicationAssignmentResponse> getAssignmentsByApplicationId(Long applicationId) {
-        return ApplicationAssignmentMockData.getAssignments()
-                .stream() .filter(
-                        a -> a.getApplicationId() .equals(applicationId))
-                .map(this::mapToResponse) .toList();
-    }
 
-    @Override
-    public ApplicationAssignmentResponse getAssignmentById(Long assignmentId) {
-        ApplicationAssignment assignment = findAssignment(assignmentId);
-        return mapToResponse(assignment);
-    }
+    // =========================================================
+    // TASK -> RESPONSE
+    // =========================================================
 
-    @Override
-    public ApplicationAssignmentResponse createAssignment( Long applicationId, ApplicationAssignmentRequest request) {
-        long newId = ApplicationAssignmentMockData .getAssignments()
-                .stream() .mapToLong(ApplicationAssignment::getAssignmentId)
-                .max() .orElse(5000L) + 1; LocalDateTime now = LocalDateTime.now();
-                ApplicationAssignment assignment = new ApplicationAssignment();
-                assignment.setAssignmentId(newId);
-                assignment.setApplicationId(applicationId);
-                assignment.setAssignedForTaskId( request.getAssignedForTaskId() );
-                assignment.setTaskStageId( request.getTaskStageId() );
-                assignment.setAssignmentStatus( request.getAssignmentStatus() != null ? request.getAssignmentStatus() : "ASSIGNED" );
-                assignment.setAssignmentRemark( request.getAssignmentRemark() );
-                assignment.setProceedToUserId( request.getProceedToUserId() );
-                assignment.setIsTerminal( request.getIsTerminal() != null ? request.getIsTerminal() : false );
-                assignment.setTotalProgress( BigDecimal.ZERO );
-                assignment.setIsActive(true);
-                assignment.setCreatedAt(now);
-                assignment.setModifiedAt(now);
-                assignment.setCreatedById(101L);
-                assignment.setModifiedById(101L);
-                assignment.setIsDeleted(false);
-                ApplicationAssignmentMockData .getAssignments()
-                        .add(assignment); return mapToResponse(assignment);
-    }
+    private TaskMasterResponse mapToResponse(
+            TaskMaster task) {
 
-    @Override
-    public ApplicationAssignmentResponse updateAssignmentStatus( Long assignmentId, AssignmentStatusUpdateRequest request) {
-        ApplicationAssignment assignment = findAssignment(assignmentId);
-        assignment.setAssignmentStatus( request.getStatus() );
-        if (request.getRemark() != null) {
-            assignment.setAssignmentRemark( request.getRemark() );
-        }
-        assignment.setModifiedAt(LocalDateTime.now());
-        return mapToResponse(assignment);
-    }
-
-    private TaskMasterResponse mapToResponse(TaskMaster task) {
         return new TaskMasterResponse(
                 task.getTaskId(),
                 task.getTaskName(),
@@ -513,10 +792,18 @@ public class ApplicationServiceImpl implements ApplicationService {
                 task.getModifiedAt(),
                 task.getCreatedById(),
                 task.getModifiedById(),
-                task.getIsDeleted() );
+                task.getIsDeleted()
+        );
     }
 
-    private TaskStageMasterResponse mapToResponse( TaskStageMaster stage) {
+
+    // =========================================================
+    // TASK STAGE -> RESPONSE
+    // =========================================================
+
+    private TaskStageMasterResponse mapToResponse(
+            TaskStageMaster stage) {
+
         return new TaskStageMasterResponse(
                 stage.getTaskStageId(),
                 stage.getStageName(),
@@ -528,16 +815,18 @@ public class ApplicationServiceImpl implements ApplicationService {
                 stage.getModifiedAt(),
                 stage.getCreatedById(),
                 stage.getModifiedById(),
-                stage.getIsDeleted() );
+                stage.getIsDeleted()
+        );
     }
 
-    private ApplicationAssignment findAssignment( Long assignmentId) {
-        return ApplicationAssignmentMockData .getAssignments() .stream() .filter(
-                a -> a.getAssignmentId() .equals(assignmentId))
-                .findFirst() .orElseThrow(() -> new RuntimeException( "Application assignment not found: " + assignmentId ) );
-    }
 
-    private ApplicationAssignmentResponse mapToResponse(ApplicationAssignment assignment) {
+    // =========================================================
+    // APPLICATION ASSIGNMENT -> RESPONSE
+    // =========================================================
+
+    private ApplicationAssignmentResponse mapToResponse(
+            ApplicationAssignment assignment) {
+
         return new ApplicationAssignmentResponse(
                 assignment.getAssignmentId(),
                 assignment.getApplicationId(),
@@ -556,7 +845,7 @@ public class ApplicationServiceImpl implements ApplicationService {
                 assignment.getModifiedById(),
                 assignment.getVerifiedById(),
                 assignment.getVerificationMode(),
-                assignment.getIsDeleted() );
+                assignment.getIsDeleted()
+        );
     }
-
 }

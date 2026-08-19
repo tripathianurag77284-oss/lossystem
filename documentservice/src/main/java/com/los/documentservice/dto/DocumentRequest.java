@@ -20,7 +20,6 @@ public class DocumentRequest {
     @NotBlank(message = "uploadStage is required")
     private String uploadStage;
 
-    @NotBlank(message = "fileUrl is required")
     private String fileUrl;
 
     @NotNull(message = "verifiedFlag is required")

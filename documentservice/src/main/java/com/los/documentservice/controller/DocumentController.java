@@ -5,7 +5,9 @@ import com.los.documentservice.dto.DocumentResponse;
 import com.los.documentservice.service.DocumentService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -29,16 +31,18 @@ public class DocumentController {
         return documentService.getDocumentById(documentId);
     }
 
-    @PostMapping
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
-    public DocumentResponse createDocument(@Valid @RequestBody DocumentRequest request) {
-        return documentService.createDocument(request);
+    public DocumentResponse createDocument(@Valid @RequestPart("document") DocumentRequest request,
+                                           @RequestPart("file") MultipartFile file) {
+        return documentService.createDocument(request, file);
     }
 
-    @PutMapping("/{documentId}")
+    @PutMapping(value = "/{documentId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public DocumentResponse updateDocument(@PathVariable Long documentId,
-                                         @Valid @RequestBody DocumentRequest request) {
-        return documentService.updateDocument(documentId, request);
+                                           @Valid @RequestPart("document") DocumentRequest request,
+                                           @RequestPart("file") MultipartFile file) {
+        return documentService.updateDocument(documentId, request, file);
     }
 
     @DeleteMapping("/{documentId}")
