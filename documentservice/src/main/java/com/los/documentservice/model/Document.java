@@ -43,4 +43,5 @@ public class Document {
     private Long verifiedBy;
     private Long validatedBy;
     private Boolean isDeleted;
+    private String verificationMethod;
 }

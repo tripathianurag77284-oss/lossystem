@@ -20,7 +20,7 @@ public final class DocumentMockData {
                         false, null, "PENDING", "MANUAL",
                         false, null, "PENDING", "MANUAL",
                         true, now, now, null, null,
-                        1001L, 1001L, null, null, false
+                        1001L, 1001L, null, null, false,"MANUAL"
                 ),
                 new Document(
                         null, 5002L, 2L, "KYC",
@@ -28,7 +28,7 @@ public final class DocumentMockData {
                         true, "Verified successfully", "VERIFIED", "AUTO",
                         true, "Validated successfully", "VALIDATED", "AUTO",
                         true, now, now, now, now,
-                        1001L, 1001L, 2001L, 2002L, false
+                        1001L, 1001L, 2001L, 2002L, false,"MANUAL"
                 )
         );
     }
