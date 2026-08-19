@@ -6,20 +6,24 @@ import com.los.documentservice.exception.DocumentNotFoundException;
 import com.los.documentservice.model.Document;
 import com.los.documentservice.repository.DocumentRepository;
 import com.los.documentservice.service.DocumentService;
+import com.los.documentservice.service.FileStorageService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import org.springframework.web.multipart.MultipartFile;
 
 @Service
 @Transactional(readOnly = true)
 public class DocumentServiceImpl implements DocumentService {
 
     private final DocumentRepository documentRepository;
+    private final FileStorageService fileStorageService;
 
-    public DocumentServiceImpl(DocumentRepository documentRepository) {
+    public DocumentServiceImpl(DocumentRepository documentRepository, FileStorageService fileStorageService) {
         this.documentRepository = documentRepository;
+        this.fileStorageService = fileStorageService;
     }
 
     @Override
@@ -37,12 +41,13 @@ public class DocumentServiceImpl implements DocumentService {
 
     @Override
     @Transactional
-    public DocumentResponse createDocument(DocumentRequest request) {
+    public DocumentResponse createDocument(DocumentRequest request, MultipartFile file) {
+        String storedPath = fileStorageService.store(file);
         Document document = new Document();
         document.setApplicantId(request.getApplicantId());
         document.setDocumentTypeId(request.getDocumentTypeId());
         document.setUploadStage(request.getUploadStage());
-        document.setFileUrl(request.getFileUrl());
+        document.setFileUrl(storedPath);
         document.setVerifiedFlag(request.getVerifiedFlag());
         document.setVerificationRemark(request.getVerificationRemark());
         document.setVerificationStatus(request.getVerificationStatus());
@@ -62,17 +67,24 @@ public class DocumentServiceImpl implements DocumentService {
         document.setValidatedBy(request.getValidatedBy());
         document.setIsDeleted(false);
 
-        return mapToResponse(documentRepository.save(document));
+        try {
+            return mapToResponse(documentRepository.save(document));
+        } catch (RuntimeException exception) {
+            fileStorageService.delete(storedPath);
+            throw exception;
+        }
     }
 
     @Override
     @Transactional
-    public DocumentResponse updateDocument(Long documentId, DocumentRequest request) {
+    public DocumentResponse updateDocument(Long documentId, DocumentRequest request, MultipartFile file) {
         Document document = findDocument(documentId);
+        String previousPath = document.getFileUrl();
+        String storedPath = fileStorageService.store(file);
         document.setApplicantId(request.getApplicantId());
         document.setDocumentTypeId(request.getDocumentTypeId());
         document.setUploadStage(request.getUploadStage());
-        document.setFileUrl(request.getFileUrl());
+        document.setFileUrl(storedPath);
         document.setVerifiedFlag(request.getVerifiedFlag());
         document.setVerificationRemark(request.getVerificationRemark());
         document.setVerificationStatus(request.getVerificationStatus());
@@ -102,13 +114,22 @@ public class DocumentServiceImpl implements DocumentService {
             document.setValidatedAt(null);
             document.setValidatedBy(null);
         }
-        return mapToResponse(documentRepository.save(document));
+        try {
+            DocumentResponse response = mapToResponse(documentRepository.save(document));
+            fileStorageService.delete(previousPath);
+            return response;
+        } catch (RuntimeException exception) {
+            fileStorageService.delete(storedPath);
+            throw exception;
+        }
     }
 
     @Override
     @Transactional
     public void deleteDocument(Long documentId) {
         Document document = findDocument(documentId);
+        fileStorageService.delete(document.getFileUrl());
+        document.setFileUrl(null);
         document.setIsDeleted(true);
         document.setIsActive(false);
         document.setModifiedAt(LocalDateTime.now());
