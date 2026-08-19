@@ -31,3 +31,7 @@ build/
 
 ### VS Code ###
 .vscode/
+
+# Locally uploaded documents
+docs/
+documentservice/docs/

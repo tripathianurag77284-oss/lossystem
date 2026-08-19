@@ -39,4 +39,15 @@ public class GlobalExceptionHandler {
                         errors
                 ));
     }
+
+    @ExceptionHandler(FileStorageException.class)
+    public ResponseEntity<ErrorResponse> handleFileStorage(FileStorageException exception) {
+        return ResponseEntity.badRequest().body(new ErrorResponse(
+                LocalDateTime.now(),
+                HttpStatus.BAD_REQUEST.value(),
+                "File Storage Error",
+                exception.getMessage(),
+                Map.of()
+        ));
+    }
 }
