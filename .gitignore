@@ -32,6 +32,9 @@ build/
 ### VS Code ###
 .vscode/
 
+# Runtime logs
+*.log
+
 # Locally uploaded documents
 docs/
 documentservice/docs/
