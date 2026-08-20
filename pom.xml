@@ -63,6 +63,7 @@
         <module>authservice</module>
         <module>applicationservice</module>
         <module>documentservice</module>
+        <module>customerservice</module>
 
     </modules>
 
