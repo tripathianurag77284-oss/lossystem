@@ -4,7 +4,10 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.los.documentservice.dto.DocumentRequest;
 import com.los.documentservice.dto.DocumentResponse;
+import com.los.documentservice.dto.DocumentTypeMasterRequest;
+import com.los.documentservice.dto.DocumentTypeMasterResponse;
 import com.los.documentservice.service.DocumentService;
+import com.los.documentservice.service.DocumentTypeMasterService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -15,10 +18,10 @@ import java.io.IOException;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/documents")
 public class DocumentController {
 
     private final DocumentService documentService;
+    private final DocumentTypeMasterService documentTypeMasterService;
 
 
 
@@ -26,13 +29,14 @@ public class DocumentController {
             DocumentService documentService) {
 
         this.documentService = documentService;
+        this.documentTypeMasterService = documentTypeMasterService;
     }
     @GetMapping
     public List<DocumentResponse> getAllDocuments() {
         return documentService.getAllDocuments();
     }
 
-    @GetMapping("/{documentId}")
+    @GetMapping("/api/documents/{documentId}")
     public DocumentResponse getDocumentById(@PathVariable Long documentId) {
         return documentService.getDocumentById(documentId);
     }
@@ -64,9 +68,37 @@ public class DocumentController {
         return documentService.updateDocument(documentId, request, file);
     }
 
-    @DeleteMapping("/{documentId}")
+    @DeleteMapping("/api/documents/{documentId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteDocument(@PathVariable Long documentId) {
         documentService.deleteDocument(documentId);
+    }
+
+    @GetMapping("/api/document-types")
+    public List<DocumentTypeMasterResponse> getAllDocumentTypes() {
+        return documentTypeMasterService.getAllDocumentTypes();
+    }
+
+    @GetMapping("/api/document-types/{documentTypeId}")
+    public DocumentTypeMasterResponse getDocumentTypeById(@PathVariable Long documentTypeId) {
+        return documentTypeMasterService.getDocumentTypeById(documentTypeId);
+    }
+
+    @PostMapping("/api/document-types")
+    @ResponseStatus(HttpStatus.CREATED)
+    public DocumentTypeMasterResponse createDocumentType(@Valid @RequestBody DocumentTypeMasterRequest request) {
+        return documentTypeMasterService.createDocumentType(request);
+    }
+
+    @PutMapping("/api/document-types/{documentTypeId}")
+    public DocumentTypeMasterResponse updateDocumentType(@PathVariable Long documentTypeId,
+                                                         @Valid @RequestBody DocumentTypeMasterRequest request) {
+        return documentTypeMasterService.updateDocumentType(documentTypeId, request);
+    }
+
+    @DeleteMapping("/api/document-types/{documentTypeId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteDocumentType(@PathVariable Long documentTypeId) {
+        documentTypeMasterService.deleteDocumentType(documentTypeId);
     }
 }

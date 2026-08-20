@@ -1,6 +1,5 @@
 package com.los.documentservice.service;
 
-import com.los.documentservice.exception.FileStorageException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -27,13 +26,13 @@ public class FileStorageService {
         try {
             Files.createDirectories(this.storageDirectory);
         } catch (IOException exception) {
-            throw new FileStorageException("Could not create document storage directory", exception);
+            throw new IllegalStateException("Could not create document storage directory", exception);
         }
     }
 
     public String store(MultipartFile file) {
         if (file == null || file.isEmpty()) {
-            throw new FileStorageException("A non-empty document file is required");
+            throw new IllegalArgumentException("A non-empty document file is required");
         }
 
         String originalName = StringUtils.cleanPath(
@@ -46,7 +45,7 @@ public class FileStorageService {
 
         Path target = storageDirectory.resolve(UUID.randomUUID() + "-" + safeName).normalize();
         if (!target.startsWith(storageDirectory)) {
-            throw new FileStorageException("Invalid document filename");
+            throw new IllegalArgumentException("Invalid document filename");
         }
 
         try {
@@ -55,7 +54,7 @@ public class FileStorageService {
                     ? workingDirectory.relativize(target).toString()
                     : target.toString();
         } catch (IOException | IllegalArgumentException exception) {
-            throw new FileStorageException("Could not store document file", exception);
+            throw new IllegalStateException("Could not store document file", exception);
         }
     }
 
@@ -71,7 +70,7 @@ public class FileStorageService {
                 Files.deleteIfExists(target);
             }
         } catch (IOException exception) {
-            throw new FileStorageException("Could not delete document file", exception);
+            throw new IllegalStateException("Could not delete document file", exception);
         }
     }
 }
