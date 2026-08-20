@@ -2,33 +2,37 @@ package com.los.documentservice.service.serviceImpl;
 
 import com.los.documentservice.dto.DocumentRequest;
 import com.los.documentservice.dto.DocumentResponse;
-import com.los.documentservice.exception.DocumentNotFoundException;
+import com.los.documentservice.mock.DocumentMockData;
 import com.los.documentservice.model.Document;
-import com.los.documentservice.repository.DocumentRepository;
 import com.los.documentservice.service.DocumentService;
 import com.los.documentservice.service.FileStorageService;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
 import org.springframework.web.multipart.MultipartFile;
 
 @Service
-@Transactional(readOnly = true)
 public class DocumentServiceImpl implements DocumentService {
 
-    private final DocumentRepository documentRepository;
+    private final List<Document> documents = new ArrayList<>();
+    private final AtomicLong nextId = new AtomicLong(1);
     private final FileStorageService fileStorageService;
 
-    public DocumentServiceImpl(DocumentRepository documentRepository, FileStorageService fileStorageService) {
-        this.documentRepository = documentRepository;
+    public DocumentServiceImpl(FileStorageService fileStorageService) {
         this.fileStorageService = fileStorageService;
+        DocumentMockData.getDocuments().forEach(document -> {
+            document.setDocumentId(nextId.getAndIncrement());
+            documents.add(document);
+        });
     }
 
     @Override
     public List<DocumentResponse> getAllDocuments() {
-        return documentRepository.findAllByIsDeletedFalse().stream()
+        return documents.stream()
+                .filter(document -> !Boolean.TRUE.equals(document.getIsDeleted()))
                 .map(this::mapToResponse)
                 .toList();
     }
@@ -128,8 +132,7 @@ public class DocumentServiceImpl implements DocumentService {
         }
     }
     @Override
-    @Transactional
-    public DocumentResponse updateDocument(Long documentId, DocumentRequest request, MultipartFile file) {
+    public synchronized DocumentResponse updateDocument(Long documentId, DocumentRequest request, MultipartFile file) {
         Document document = findDocument(documentId);
         String previousPath = document.getFileUrl();
         String storedPath = fileStorageService.store(file);
@@ -166,31 +169,26 @@ public class DocumentServiceImpl implements DocumentService {
             document.setValidatedAt(null);
             document.setValidatedBy(null);
         }
-        try {
-            DocumentResponse response = mapToResponse(documentRepository.save(document));
-            fileStorageService.delete(previousPath);
-            return response;
-        } catch (RuntimeException exception) {
-            fileStorageService.delete(storedPath);
-            throw exception;
-        }
+        fileStorageService.delete(previousPath);
+        return mapToResponse(document);
     }
 
     @Override
-    @Transactional
-    public void deleteDocument(Long documentId) {
+    public synchronized void deleteDocument(Long documentId) {
         Document document = findDocument(documentId);
         fileStorageService.delete(document.getFileUrl());
         document.setFileUrl(null);
         document.setIsDeleted(true);
         document.setIsActive(false);
         document.setModifiedAt(LocalDateTime.now());
-        documentRepository.save(document);
     }
 
     private Document findDocument(Long documentId) {
-        return documentRepository.findByDocumentIdAndIsDeletedFalse(documentId)
-                .orElseThrow(() -> new DocumentNotFoundException(documentId));
+        return documents.stream()
+                .filter(document -> documentId.equals(document.getDocumentId()))
+                .filter(document -> !Boolean.TRUE.equals(document.getIsDeleted()))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Document not found: " + documentId));
     }
 
     private DocumentResponse mapToResponse(Document document) {
