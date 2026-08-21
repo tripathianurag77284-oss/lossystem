@@ -1,0 +1,18 @@
+package com.los.customerservice.dto;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class DocumentTypeRequest {
+
+    private String documentName;
+    private String category;
+    private Boolean isPoi;
+    private Boolean isPoa;
+    private Boolean isFacialDocument;
+    private Boolean isActive;
+}
