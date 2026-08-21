@@ -1,37 +1,48 @@
 package com.los.documentservice.controller;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.los.documentservice.dto.DocumentRequest;
 import com.los.documentservice.dto.DocumentResponse;
 import com.los.documentservice.dto.DocumentTypeMasterRequest;
 import com.los.documentservice.dto.DocumentTypeMasterResponse;
 import com.los.documentservice.service.DocumentService;
 import com.los.documentservice.service.DocumentTypeMasterService;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Valid;
+import jakarta.validation.Validator;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import tools.jackson.databind.ObjectMapper;
 
-import java.io.IOException;
 import java.util.List;
+import java.util.Set;
 
 @RestController
 public class DocumentController {
 
     private final DocumentService documentService;
     private final DocumentTypeMasterService documentTypeMasterService;
+    private final ObjectMapper objectMapper;
+    private final Validator validator;
 
-
-
-    public DocumentController(
-            DocumentService documentService) {
-
+    public DocumentController(DocumentService documentService,
+                              DocumentTypeMasterService documentTypeMasterService,
+                              ObjectMapper objectMapper,
+                              Validator validator) {
         this.documentService = documentService;
         this.documentTypeMasterService = documentTypeMasterService;
+        this.objectMapper = objectMapper;
+        this.validator = validator;
     }
-    @GetMapping
+
+    @GetMapping("/")
+    public String home() {
+        return "redirect:/swagger-ui.html";
+    }
+
+    @GetMapping("/api/documents")
     public List<DocumentResponse> getAllDocuments() {
         return documentService.getAllDocuments();
     }
@@ -41,31 +52,18 @@ public class DocumentController {
         return documentService.getDocumentById(documentId);
     }
 
-    @PostMapping(
-            consumes = MediaType.MULTIPART_FORM_DATA_VALUE
-    )
+    @PostMapping(value = "/api/documents", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
-    public DocumentResponse createDocument(
-            @RequestPart("document") String documentJson,
-            @RequestPart("file") MultipartFile file)
-            throws JsonProcessingException {
-
-        DocumentRequest request =
-                new ObjectMapper().readValue(
-                        documentJson,
-                        DocumentRequest.class
-                );
-
-        return documentService.createDocument(
-                request,
-                file
-        );
-    }
-    @PutMapping(value = "/{documentId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public DocumentResponse updateDocument(@PathVariable Long documentId,
-                                           @Valid @RequestPart("document") DocumentRequest request,
+    public DocumentResponse createDocument(@RequestPart("document") String documentJson,
                                            @RequestPart("file") MultipartFile file) {
-        return documentService.updateDocument(documentId, request, file);
+        return documentService.createDocument(parseDocumentRequest(documentJson), file);
+    }
+
+    @PutMapping(value = "/api/documents/{documentId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public DocumentResponse updateDocument(@PathVariable Long documentId,
+                                           @RequestPart("document") String documentJson,
+                                           @RequestPart("file") MultipartFile file) {
+        return documentService.updateDocument(documentId, parseDocumentRequest(documentJson), file);
     }
 
     @DeleteMapping("/api/documents/{documentId}")
@@ -100,5 +98,20 @@ public class DocumentController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteDocumentType(@PathVariable Long documentTypeId) {
         documentTypeMasterService.deleteDocumentType(documentTypeId);
+    }
+
+    private DocumentRequest parseDocumentRequest(String documentJson) {
+        try {
+            DocumentRequest request = objectMapper.readValue(documentJson, DocumentRequest.class);
+            Set<ConstraintViolation<DocumentRequest>> violations = validator.validate(request);
+            if (!violations.isEmpty()) {
+                throw new ConstraintViolationException(violations);
+            }
+            return request;
+        } catch (ConstraintViolationException exception) {
+            throw exception;
+        } catch (Exception exception) {
+            throw new IllegalArgumentException("The document form field must contain valid JSON", exception);
+        }
     }
 }
