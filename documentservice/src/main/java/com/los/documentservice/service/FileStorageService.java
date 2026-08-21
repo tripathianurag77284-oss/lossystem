@@ -1,5 +1,6 @@
 package com.los.documentservice.service;
 
+import com.los.documentservice.exception.UnsupportedDocumentMediaTypeException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -10,9 +11,14 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.UUID;
+import java.util.Locale;
+import java.util.Set;
 
 @Service
 public class FileStorageService {
+
+    private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of("application/pdf", "image/png");
+    private static final Set<String> ALLOWED_EXTENSIONS = Set.of(".pdf", ".png");
 
     private final Path storageDirectory;
     private final Path workingDirectory;
@@ -43,6 +49,8 @@ public class FileStorageService {
             safeName = "document";
         }
 
+        validateMediaType(file, safeName);
+
         Path target = storageDirectory.resolve(UUID.randomUUID() + "-" + safeName).normalize();
         if (!target.startsWith(storageDirectory)) {
             throw new IllegalArgumentException("Invalid document filename");
@@ -55,6 +63,20 @@ public class FileStorageService {
                     : target.toString();
         } catch (IOException | IllegalArgumentException exception) {
             throw new IllegalStateException("Could not store document file", exception);
+        }
+    }
+
+    private void validateMediaType(MultipartFile file, String filename) {
+        String contentType = file.getContentType();
+        String lowerFilename = filename.toLowerCase(Locale.ROOT);
+        boolean allowedExtension = ALLOWED_EXTENSIONS.stream().anyMatch(lowerFilename::endsWith);
+        boolean allowedContentType = contentType == null
+                || contentType.isBlank()
+                || "application/octet-stream".equalsIgnoreCase(contentType)
+                || ALLOWED_CONTENT_TYPES.contains(contentType.toLowerCase(Locale.ROOT));
+
+        if (!allowedExtension || !allowedContentType) {
+            throw new UnsupportedDocumentMediaTypeException("Only PDF and PNG documents are supported");
         }
     }
 

@@ -38,3 +38,7 @@ build/
 # Locally uploaded documents
 docs/
 documentservice/docs/
+
+# Local environment credentials
+.env
+**/.env
