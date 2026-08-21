@@ -4,24 +4,21 @@ import com.los.applicationservice.dto.*;
 import com.los.applicationservice.service.ApplicationService;
 import com.los.applicationservice.service.LeadService;
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/applications")
+@RequestMapping("/api")
 public class ApplicationController {
 
     private final LeadService leadService;
-
     private final ApplicationService applicationService;
 
-
-    @Autowired
     public ApplicationController(
-            LeadService leadService, ApplicationService applicationService) {
+            LeadService leadService,
+            ApplicationService applicationService) {
 
         this.leadService = leadService;
         this.applicationService = applicationService;
@@ -29,50 +26,30 @@ public class ApplicationController {
 
 
     // =========================================================
-    // GET ALL
+    // LEAD
     // =========================================================
 
-    @GetMapping
+    @GetMapping("/leads")
     public List<LeadResponse> getAllLeads() {
-
         return leadService.getAllLeads();
     }
 
-
-    // =========================================================
-    // GET BY ID
-    // =========================================================
-
-    @GetMapping("/{leadId}")
+    @GetMapping("/leads/{leadId}")
     public LeadResponse getLeadById(
             @PathVariable Long leadId) {
 
-        return leadService.getLeadById(
-                leadId
-        );
+        return leadService.getLeadById(leadId);
     }
 
-
-    // =========================================================
-    // CREATE
-    // =========================================================
-
-    @PostMapping
+    @PostMapping("/leads")
     @ResponseStatus(HttpStatus.CREATED)
     public LeadResponse createLead(
             @Valid @RequestBody LeadRequest request) {
 
-        return leadService.createLead(
-                request
-        );
+        return leadService.createLead(request);
     }
 
-
-    // =========================================================
-    // UPDATE
-    // =========================================================
-
-    @PutMapping("/{leadId}")
+    @PutMapping("/leads/{leadId}")
     public LeadResponse updateLead(
             @PathVariable Long leadId,
             @Valid @RequestBody LeadRequest request) {
@@ -83,31 +60,18 @@ public class ApplicationController {
         );
     }
 
-
-    // =========================================================
-    // DELETE
-    // =========================================================
-
-    @DeleteMapping("/{leadId}")
+    @DeleteMapping("/leads/{leadId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteLead(
             @PathVariable Long leadId) {
 
-        leadService.deleteLead(
-                leadId
-        );
+        leadService.deleteLead(leadId);
     }
 
-
-    // =========================================================
-    // LEAD PROCESSING / STATUS
-    // =========================================================
-
-    @PatchMapping("/{leadId}/status")
+    @PatchMapping("/leads/{leadId}/status")
     public LeadResponse updateLeadStatus(
             @PathVariable Long leadId,
-            @Valid @RequestBody
-            ApplicationStatusUpdateRequest request) {
+            @Valid @RequestBody ApplicationStatusUpdateRequest request) {
 
         return leadService.updateLeadStatus(
                 leadId,
@@ -115,35 +79,22 @@ public class ApplicationController {
         );
     }
 
-
-    // =========================================================
-    // LEAD TRACKING
-    // =========================================================
-
-    @GetMapping("/{leadId}/tracking")
+    @GetMapping("/leads/{leadId}/tracking")
     public List<LeadTrackingResponse> getLeadTracking(
             @PathVariable Long leadId) {
 
-        return leadService.getLeadTracking(
-                leadId
-        );
+        return leadService.getLeadTracking(leadId);
     }
 
 
-// =========================================================
-// APPLICATION - GET ALL
-// =========================================================
+    // =========================================================
+    // APPLICATION
+    // =========================================================
 
     @GetMapping("/applications")
     public List<ApplicationResponse> getAllApplications() {
-
         return applicationService.getAllApplications();
     }
-
-
-// =========================================================
-// APPLICATION - GET BY ID
-// =========================================================
 
     @GetMapping("/applications/{applicationId}")
     public ApplicationResponse getApplicationById(
@@ -154,25 +105,13 @@ public class ApplicationController {
         );
     }
 
-
-// =========================================================
-// APPLICATION - CREATE
-// =========================================================
-
     @PostMapping("/applications")
     @ResponseStatus(HttpStatus.CREATED)
     public ApplicationResponse createApplication(
             @Valid @RequestBody ApplicationRequest request) {
 
-        return applicationService.createApplication(
-                request
-        );
+        return applicationService.createApplication(request);
     }
-
-
-// =========================================================
-// APPLICATION - UPDATE
-// =========================================================
 
     @PutMapping("/applications/{applicationId}")
     public ApplicationResponse updateApplication(
@@ -185,25 +124,13 @@ public class ApplicationController {
         );
     }
 
-
-// =========================================================
-// APPLICATION - DELETE
-// =========================================================
-
     @DeleteMapping("/applications/{applicationId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteApplication(
             @PathVariable Long applicationId) {
 
-        applicationService.deleteApplication(
-                applicationId
-        );
+        applicationService.deleteApplication(applicationId);
     }
-
-
-// =========================================================
-// APPLICATION - UPDATE STATUS
-// =========================================================
 
     @PutMapping("/applications/{applicationId}/status")
     public ApplicationResponse updateApplicationStatus(
@@ -216,30 +143,6 @@ public class ApplicationController {
         );
     }
 
-// =========================================================
-// LOAN PRODUCT - GET BY ID
-// =========================================================
-
-    @GetMapping("/loan-products/{productId}")
-    public LoanProductResponse getLoanProductById(
-            @PathVariable Long productId) {
-
-        return applicationService.getLoanProductById(productId);
-    }
-
-// =========================================================
-// LOAN PRODUCT - GET ALL
-// =========================================================
-
-    @GetMapping("/loan-products")
-    public List<LoanProductResponse> getAllLoanProducts() {
-
-        return applicationService.getAllLoanProducts();
-    }
-// =========================================================
-// APPLICATION - LOAN SPECIFICATION
-// =========================================================
-
     @PutMapping("/applications/{applicationId}/loan-specification")
     public ApplicationResponse updateLoanSpecification(
             @PathVariable Long applicationId,
@@ -251,22 +154,39 @@ public class ApplicationController {
         );
     }
 
-
-// =========================================================
-// APPLICATION - RESUME
-// =========================================================
-
     @PostMapping("/applications/{applicationId}/resume")
     public ApplicationResponse resumeApplication(
             @PathVariable Long applicationId) {
 
-        return applicationService.resumeApplication(applicationId);
+        return applicationService.resumeApplication(
+                applicationId
+        );
     }
 
 
-// =========================================================
-// LEAD ASSIGNMENT - CREATE
-// =========================================================
+    // =========================================================
+    // LOAN PRODUCT
+    // =========================================================
+
+    @GetMapping("/loan-products")
+    public List<LoanProductResponse> getAllLoanProducts() {
+
+        return applicationService.getAllLoanProducts();
+    }
+
+    @GetMapping("/loan-products/{productId}")
+    public LoanProductResponse getLoanProductById(
+            @PathVariable Long productId) {
+
+        return applicationService.getLoanProductById(
+                productId
+        );
+    }
+
+
+    // =========================================================
+    // LEAD ASSIGNMENT
+    // =========================================================
 
     @PostMapping("/leads/{leadId}/assignments")
     @ResponseStatus(HttpStatus.CREATED)
@@ -280,11 +200,6 @@ public class ApplicationController {
         );
     }
 
-
-// =========================================================
-// LEAD ASSIGNMENT - GET ALL FOR LEAD
-// =========================================================
-
     @GetMapping("/leads/{leadId}/assignments")
     public List<LeadAssignmentResponse> getLeadAssignments(
             @PathVariable Long leadId) {
@@ -294,12 +209,7 @@ public class ApplicationController {
         );
     }
 
-
-// =========================================================
-// LEAD ASSIGNMENT - GET BY ID
-// =========================================================
-
-    @GetMapping("/assignments/{assignmentId}")
+    @GetMapping("/lead-assignments/{assignmentId}")
     public LeadAssignmentResponse getLeadAssignmentById(
             @PathVariable Long assignmentId) {
 
@@ -308,12 +218,7 @@ public class ApplicationController {
         );
     }
 
-
-// =========================================================
-// LEAD ASSIGNMENT - UPDATE
-// =========================================================
-
-    @PutMapping("/assignments/{assignmentId}")
+    @PutMapping("/lead-assignments/{assignmentId}")
     public LeadAssignmentResponse updateLeadAssignment(
             @PathVariable Long assignmentId,
             @Valid @RequestBody LeadAssignmentRequest request) {
@@ -324,12 +229,7 @@ public class ApplicationController {
         );
     }
 
-
-// =========================================================
-// LEAD ASSIGNMENT - DELETE
-// =========================================================
-
-    @DeleteMapping("/assignments/{assignmentId}")
+    @DeleteMapping("/lead-assignments/{assignmentId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteLeadAssignment(
             @PathVariable Long assignmentId) {
@@ -339,16 +239,16 @@ public class ApplicationController {
         );
     }
 
-// =========================================================
-// TASK MASTER
-// =========================================================
+
+    // =========================================================
+    // TASK MASTER
+    // =========================================================
 
     @GetMapping("/tasks")
     public List<TaskMasterResponse> getAllTasks() {
 
         return applicationService.getAllTasks();
     }
-
 
     @GetMapping("/tasks/{taskId}")
     public TaskMasterResponse getTaskById(
@@ -358,9 +258,9 @@ public class ApplicationController {
     }
 
 
-// =========================================================
-// TASK STAGE MASTER
-// =========================================================
+    // =========================================================
+    // TASK STAGE MASTER
+    // =========================================================
 
     @GetMapping("/task-stages")
     public List<TaskStageMasterResponse> getAllTaskStages() {
@@ -368,18 +268,19 @@ public class ApplicationController {
         return applicationService.getAllTaskStages();
     }
 
-
     @GetMapping("/task-stages/{taskStageId}")
     public TaskStageMasterResponse getTaskStageById(
             @PathVariable Long taskStageId) {
 
-        return applicationService.getTaskStageById(taskStageId);
+        return applicationService.getTaskStageById(
+                taskStageId
+        );
     }
 
 
-// =========================================================
-// APPLICATION ASSIGNMENT
-// =========================================================
+    // =========================================================
+    // APPLICATION ASSIGNMENT
+    // =========================================================
 
     @GetMapping("/applications/{applicationId}/assignments")
     public List<ApplicationAssignmentResponse>
@@ -387,9 +288,10 @@ public class ApplicationController {
             @PathVariable Long applicationId) {
 
         return applicationService
-                .getAssignmentsByApplicationId(applicationId);
+                .getAssignmentsByApplicationId(
+                        applicationId
+                );
     }
-
 
     @GetMapping("/application-assignments/{assignmentId}")
     public ApplicationAssignmentResponse
@@ -397,39 +299,33 @@ public class ApplicationController {
             @PathVariable Long assignmentId) {
 
         return applicationService
-                .getAssignmentById(assignmentId);
+                .getAssignmentById(
+                        assignmentId
+                );
     }
-
 
     @PostMapping("/applications/{applicationId}/assignments")
     @ResponseStatus(HttpStatus.CREATED)
     public ApplicationAssignmentResponse
     createApplicationAssignment(
             @PathVariable Long applicationId,
-            @Valid @RequestBody
-            ApplicationAssignmentRequest request) {
+            @Valid @RequestBody ApplicationAssignmentRequest request) {
 
-        return applicationService
-                .createAssignment(
-                        applicationId,
-                        request
-                );
+        return applicationService.createAssignment(
+                applicationId,
+                request
+        );
     }
-
 
     @PutMapping("/application-assignments/{assignmentId}/status")
     public ApplicationAssignmentResponse
     updateApplicationAssignmentStatus(
             @PathVariable Long assignmentId,
-            @Valid @RequestBody
-            AssignmentStatusUpdateRequest request) {
+            @Valid @RequestBody AssignmentStatusUpdateRequest request) {
 
-        return applicationService
-                .updateAssignmentStatus(
-                        assignmentId,
-                        request
-                );
+        return applicationService.updateAssignmentStatus(
+                assignmentId,
+                request
+        );
     }
-
-
-}
+} 

@@ -1,67 +1,35 @@
 package com.los.applicationservice.service.serviceImpl;
 
-
 import com.los.applicationservice.dto.*;
 import com.los.applicationservice.exception.ApplicationNotFoundException;
 import com.los.applicationservice.kafka.KafkaProducerService;
 import com.los.applicationservice.kafka.event.LeadCreatedEvent;
-
-import com.los.applicationservice.mock.LeadAssignmentMockData;
-import com.los.applicationservice.mock.LeadMockData;
 import com.los.applicationservice.model.ApplicationStatus;
 import com.los.applicationservice.model.Lead;
+import com.los.applicationservice.model.LeadActivity;
 import com.los.applicationservice.model.LeadAssignment;
+import com.los.applicationservice.repository.LeadActivityRepository;
+import com.los.applicationservice.repository.LeadAssignmentRepository;
+import com.los.applicationservice.repository.LeadRepository;
 import com.los.applicationservice.service.LeadService;
-
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 @Service
+@RequiredArgsConstructor
 public class LeadServiceImpl implements LeadService {
 
-    /*
-     * =========================================================
-     * MOCK LEAD DATA
-     * =========================================================
-     *
-     * Later replace this with LeadRepository + PostgreSQL.
-     */
+    private final LeadRepository leadRepository;
 
-    private final List<Lead> leads =
-            LeadMockData.getLeads();
+    private final LeadAssignmentRepository leadAssignmentRepository;
 
-
-    /*
-     * =========================================================
-     * MOCK TRACKING DATA
-     * =========================================================
-     */
-
-    private final Map<Long, List<LeadTrackingResponse>>
-            trackingData = new HashMap<>();
-
-
-    /*
-     * =========================================================
-     * KAFKA PRODUCER
-     * =========================================================
-     */
+    private final LeadActivityRepository leadActivityRepository;
 
     private final KafkaProducerService kafkaProducerService;
-
-
-    @Autowired
-    public LeadServiceImpl(
-            KafkaProducerService kafkaProducerService) {
-
-        this.kafkaProducerService = kafkaProducerService;
-    }
 
 
     // =========================================================
@@ -69,9 +37,11 @@ public class LeadServiceImpl implements LeadService {
     // =========================================================
 
     @Override
+    @Transactional(readOnly = true)
     public List<LeadResponse> getAllLeads() {
 
-        return leads.stream()
+        return leadRepository.findAll()
+                .stream()
                 .map(this::mapToResponse)
                 .toList();
     }
@@ -82,8 +52,8 @@ public class LeadServiceImpl implements LeadService {
     // =========================================================
 
     @Override
-    public LeadResponse getLeadById(
-            Long leadId) {
+    @Transactional(readOnly = true)
+    public LeadResponse getLeadById(Long leadId) {
 
         Lead lead = findLead(leadId);
 
@@ -96,31 +66,12 @@ public class LeadServiceImpl implements LeadService {
     // =========================================================
 
     @Override
-    public LeadResponse createLead(
-            LeadRequest request) {
+    @Transactional
+    public LeadResponse createLead(LeadRequest request) {
 
-        /*
-         * Generate mock ID.
-         */
-
-        long newId = leads.stream()
-                .mapToLong(Lead::getLeadId)
-                .max()
-                .orElse(1000L) + 1;
-
-
-        /*
-         * Create Lead object.
-         */
+        LocalDateTime now = LocalDateTime.now();
 
         Lead lead = new Lead();
-
-        lead.setLeadId(newId);
-
-
-        // =====================================================
-        // REQUEST DATA
-        // =====================================================
 
         lead.setSourceName(
                 request.getSourceName()
@@ -146,45 +97,28 @@ public class LeadServiceImpl implements LeadService {
                 request.getDescription()
         );
 
-
-        // =====================================================
-        // INITIAL STATUS
-        // =====================================================
-
+        // Initial status
         lead.setStatus(
                 ApplicationStatus.NEW
         );
 
-
-        // =====================================================
-        // SYSTEM FIELDS
-        // =====================================================
-
+        // System fields
         lead.setIsActive(true);
-
         lead.setIsDeleted(false);
-
-        LocalDateTime now =
-                LocalDateTime.now();
-
         lead.setCreatedAt(now);
-
         lead.setModifiedAt(now);
 
-        /*
-         * Mock logged-in user.
-         */
-
+        // Temporary logged-in user
         lead.setCreatedById(101L);
-
         lead.setModifiedById(101L);
 
-
-        // =====================================================
-        // SAVE TO MOCK LIST
-        // =====================================================
-
-        leads.add(lead);
+        /*
+         * Save to PostgreSQL.
+         *
+         * leadId is generated by JPA/PostgreSQL.
+         */
+        Lead savedLead =
+                leadRepository.save(lead);
 
 
         // =====================================================
@@ -192,7 +126,7 @@ public class LeadServiceImpl implements LeadService {
         // =====================================================
 
         addTracking(
-                newId,
+                savedLead.getLeadId(),
                 ApplicationStatus.NEW,
                 "Lead created"
         );
@@ -204,28 +138,22 @@ public class LeadServiceImpl implements LeadService {
 
         LeadCreatedEvent event =
                 new LeadCreatedEvent(
-                        lead.getLeadId(),
-                        lead.getSourceName(),
-                        lead.getChannelType(),
-                        lead.getMobile(),
-                        lead.getPan(),
-                        lead.getDob(),
-                        lead.getStatus(),
-                        lead.getDescription()
+                        savedLead.getLeadId(),
+                        savedLead.getSourceName(),
+                        savedLead.getChannelType(),
+                        savedLead.getMobile(),
+                        savedLead.getPan(),
+                        savedLead.getDob(),
+                        savedLead.getStatus(),
+                        savedLead.getDescription()
                 );
 
-
         kafkaProducerService.sendLeadCreated(
-                lead.getLeadId(),
+                savedLead.getLeadId(),
                 event
         );
 
-
-        // =====================================================
-        // RESPONSE
-        // =====================================================
-
-        return mapToResponse(lead);
+        return mapToResponse(savedLead);
     }
 
 
@@ -234,17 +162,13 @@ public class LeadServiceImpl implements LeadService {
     // =========================================================
 
     @Override
+    @Transactional
     public LeadResponse updateLead(
             Long leadId,
             LeadRequest request) {
 
         Lead existingLead =
                 findLead(leadId);
-
-
-        // =====================================================
-        // UPDATE BUSINESS FIELDS
-        // =====================================================
 
         existingLead.setSourceName(
                 request.getSourceName()
@@ -270,11 +194,6 @@ public class LeadServiceImpl implements LeadService {
                 request.getDescription()
         );
 
-
-        // =====================================================
-        // UPDATE SYSTEM FIELDS
-        // =====================================================
-
         existingLead.setModifiedAt(
                 LocalDateTime.now()
         );
@@ -283,10 +202,10 @@ public class LeadServiceImpl implements LeadService {
                 101L
         );
 
+        Lead updatedLead =
+                leadRepository.save(existingLead);
 
-        return mapToResponse(
-                existingLead
-        );
+        return mapToResponse(updatedLead);
     }
 
 
@@ -295,15 +214,19 @@ public class LeadServiceImpl implements LeadService {
     // =========================================================
 
     @Override
-    public void deleteLead(
-            Long leadId) {
+    @Transactional
+    public void deleteLead(Long leadId) {
 
         Lead existingLead =
                 findLead(leadId);
 
-        leads.remove(existingLead);
-
-        trackingData.remove(leadId);
+        /*
+         * Hard delete.
+         *
+         * If you want soft delete instead,
+         * we can change this later.
+         */
+        leadRepository.delete(existingLead);
     }
 
 
@@ -312,6 +235,7 @@ public class LeadServiceImpl implements LeadService {
     // =========================================================
 
     @Override
+    @Transactional
     public LeadResponse updateLeadStatus(
             Long leadId,
             ApplicationStatusUpdateRequest request) {
@@ -319,10 +243,8 @@ public class LeadServiceImpl implements LeadService {
         Lead lead =
                 findLead(leadId);
 
-
         ApplicationStatus oldStatus =
                 lead.getStatus();
-
 
         ApplicationStatus newStatus =
                 request.getStatus();
@@ -342,14 +264,7 @@ public class LeadServiceImpl implements LeadService {
         // UPDATE STATUS
         // =====================================================
 
-        lead.setStatus(
-                newStatus
-        );
-
-
-        // =====================================================
-        // UPDATE SYSTEM DATA
-        // =====================================================
+        lead.setStatus(newStatus);
 
         lead.setModifiedAt(
                 LocalDateTime.now()
@@ -358,6 +273,9 @@ public class LeadServiceImpl implements LeadService {
         lead.setModifiedById(
                 101L
         );
+
+        Lead updatedLead =
+                leadRepository.save(lead);
 
 
         // =====================================================
@@ -370,41 +288,35 @@ public class LeadServiceImpl implements LeadService {
                         + " to "
                         + newStatus;
 
-
         addTracking(
-                leadId,
+                updatedLead.getLeadId(),
                 newStatus,
                 remarks
         );
 
 
         // =====================================================
-        // KAFKA STATUS EVENT
+        // KAFKA EVENT
         // =====================================================
 
         LeadCreatedEvent event =
                 new LeadCreatedEvent(
-                        lead.getLeadId(),
-                        lead.getSourceName(),
-                        lead.getChannelType(),
-                        lead.getMobile(),
-                        lead.getPan(),
-                        lead.getDob(),
-                        lead.getStatus(),
-                        lead.getDescription()
+                        updatedLead.getLeadId(),
+                        updatedLead.getSourceName(),
+                        updatedLead.getChannelType(),
+                        updatedLead.getMobile(),
+                        updatedLead.getPan(),
+                        updatedLead.getDob(),
+                        updatedLead.getStatus(),
+                        updatedLead.getDescription()
                 );
 
-
-        kafkaProducerService
-                .sendLeadCreated(
-                        lead.getLeadId(),
-                        event
-                );
-
-
-        return mapToResponse(
-                lead
+        kafkaProducerService.sendLeadCreated(
+                updatedLead.getLeadId(),
+                event
         );
+
+        return mapToResponse(updatedLead);
     }
 
 
@@ -413,20 +325,18 @@ public class LeadServiceImpl implements LeadService {
     // =========================================================
 
     @Override
+    @Transactional(readOnly = true)
     public List<LeadTrackingResponse> getLeadTracking(
             Long leadId) {
 
-        /*
-         * Make sure lead exists.
-         */
-
+        // Make sure lead exists
         findLead(leadId);
 
-
-        return trackingData.getOrDefault(
-                leadId,
-                new ArrayList<>()
-        );
+        return leadActivityRepository
+                .findByLeadIdOrderByCreatedAtAsc(leadId)
+                .stream()
+                .map(this::mapActivityToResponse)
+                .toList();
     }
 
 
@@ -434,25 +344,15 @@ public class LeadServiceImpl implements LeadService {
     // FIND LEAD
     // =========================================================
 
-    private Lead findLead(
-            Long leadId) {
+    private Lead findLead(Long leadId) {
 
-        return leads.stream()
-
-                .filter(
-                        lead ->
-                                lead.getLeadId()
-                                        .equals(leadId)
-                )
-
-                .findFirst()
-
+        return leadRepository
+                .findById(leadId)
                 .orElseThrow(
-                        () ->
-                                new ApplicationNotFoundException(
-                                        "Lead not found with id: "
-                                                + leadId
-                                )
+                        () -> new ApplicationNotFoundException(
+                                "Lead not found with id: "
+                                        + leadId
+                        )
                 );
     }
 
@@ -466,24 +366,26 @@ public class LeadServiceImpl implements LeadService {
             ApplicationStatus status,
             String remarks) {
 
-        LeadTrackingResponse tracking =
-                new LeadTrackingResponse(
-                        leadId,
-                        status,
-                        LocalDateTime.now(),
-                        remarks
-                );
+        LeadActivity activity =
+                new LeadActivity();
 
+        activity.setLeadId(leadId);
 
-        trackingData
+        activity.setAction(
+                "STATUS_CHANGE"
+        );
 
-                .computeIfAbsent(
-                        leadId,
-                        key ->
-                                new ArrayList<>()
-                )
+        activity.setOldStatus(null);
 
-                .add(tracking);
+        activity.setNewStatus(status);
+
+        activity.setRemarks(remarks);
+
+        activity.setCreatedAt(
+                LocalDateTime.now()
+        );
+
+        leadActivityRepository.save(activity);
     }
 
 
@@ -495,10 +397,6 @@ public class LeadServiceImpl implements LeadService {
             ApplicationStatus oldStatus,
             ApplicationStatus newStatus) {
 
-        /*
-         * Same status is not allowed.
-         */
-
         if (oldStatus == newStatus) {
 
             throw new IllegalArgumentException(
@@ -506,7 +404,6 @@ public class LeadServiceImpl implements LeadService {
                             + newStatus
             );
         }
-
 
         /*
          * For now all different transitions
@@ -523,45 +420,50 @@ public class LeadServiceImpl implements LeadService {
             Lead lead) {
 
         return new LeadResponse(
-
                 lead.getLeadId(),
-
                 lead.getSourceName(),
-
                 lead.getChannelType(),
-
                 lead.getMobile(),
-
                 lead.getPan(),
-
                 lead.getDob(),
-
                 lead.getStatus(),
-
                 lead.getDescription(),
-
                 lead.getIsActive(),
-
                 lead.getCreatedAt(),
-
                 lead.getModifiedAt(),
-
                 lead.getCreatedById(),
-
                 lead.getModifiedById(),
-
                 lead.getIsDeleted()
         );
     }
+
+
+    // =========================================================
+    // ACTIVITY -> TRACKING RESPONSE
+    // =========================================================
+
+    private LeadTrackingResponse mapActivityToResponse(
+            LeadActivity activity) {
+
+        return new LeadTrackingResponse(
+                activity.getLeadId(),
+                activity.getNewStatus(),
+                activity.getCreatedAt(),
+                activity.getRemarks()
+        );
+    }
+
 
     // =========================================================
     // GET ALL ASSIGNMENTS
     // =========================================================
 
     @Override
+    @Transactional(readOnly = true)
     public List<LeadAssignmentResponse> getAllAssignments() {
 
-        return LeadAssignmentMockData.getAssignments()
+        return leadAssignmentRepository
+                .findAll()
                 .stream()
                 .map(this::toResponse)
                 .toList();
@@ -573,13 +475,15 @@ public class LeadServiceImpl implements LeadService {
     // =========================================================
 
     @Override
+    @Transactional(readOnly = true)
     public List<LeadAssignmentResponse> getAssignmentsByLeadId(
             Long leadId) {
 
-        return LeadAssignmentMockData.getAssignments()
+        findLead(leadId);
+
+        return leadAssignmentRepository
+                .findByLeadId(leadId)
                 .stream()
-                .filter(assignment ->
-                        assignment.getLeadId().equals(leadId))
                 .map(this::toResponse)
                 .toList();
     }
@@ -590,21 +494,12 @@ public class LeadServiceImpl implements LeadService {
     // =========================================================
 
     @Override
+    @Transactional(readOnly = true)
     public LeadAssignmentResponse getAssignmentById(
             Long assignmentId) {
 
         LeadAssignment assignment =
-                LeadAssignmentMockData.getAssignments()
-                        .stream()
-                        .filter(a ->
-                                a.getAssignmentId().equals(assignmentId))
-                        .findFirst()
-                        .orElseThrow(() ->
-                                new RuntimeException(
-                                        "Lead assignment not found: "
-                                                + assignmentId
-                                )
-                        );
+                findAssignment(assignmentId);
 
         return toResponse(assignment);
     }
@@ -615,15 +510,19 @@ public class LeadServiceImpl implements LeadService {
     // =========================================================
 
     @Override
+    @Transactional
     public LeadAssignmentResponse createAssignment(
             Long leadId,
             LeadAssignmentRequest request) {
 
-        LeadAssignment assignment = new LeadAssignment();
+        // Make sure lead exists
+        findLead(leadId);
 
-        assignment.setAssignmentId(
-                generateAssignmentId()
-        );
+        LocalDateTime now =
+                LocalDateTime.now();
+
+        LeadAssignment assignment =
+                new LeadAssignment();
 
         assignment.setLeadId(leadId);
 
@@ -649,21 +548,25 @@ public class LeadServiceImpl implements LeadService {
 
         assignment.setIsActive(true);
 
-        assignment.setCreatedAt(
-                LocalDateTime.now()
-        );
+        assignment.setCreatedAt(now);
 
-        assignment.setModifiedAt(
-                LocalDateTime.now()
-        );
+        assignment.setModifiedAt(now);
+
+        assignment.setCreatedById(101L);
+
+        assignment.setModifiedById(101L);
 
         assignment.setIsDeleted(false);
 
-        LeadAssignmentMockData
-                .getAssignments()
-                .add(assignment);
+        /*
+         * assignmentId is generated by JPA/PostgreSQL.
+         */
+        LeadAssignment savedAssignment =
+                leadAssignmentRepository.save(
+                        assignment
+                );
 
-        return toResponse(assignment);
+        return toResponse(savedAssignment);
     }
 
 
@@ -672,22 +575,13 @@ public class LeadServiceImpl implements LeadService {
     // =========================================================
 
     @Override
+    @Transactional
     public LeadAssignmentResponse updateAssignment(
             Long assignmentId,
             LeadAssignmentRequest request) {
 
         LeadAssignment assignment =
-                LeadAssignmentMockData.getAssignments()
-                        .stream()
-                        .filter(a ->
-                                a.getAssignmentId().equals(assignmentId))
-                        .findFirst()
-                        .orElseThrow(() ->
-                                new RuntimeException(
-                                        "Lead assignment not found: "
-                                                + assignmentId
-                                )
-                        );
+                findAssignment(assignmentId);
 
         assignment.setAssignedForTaskId(
                 request.getAssignedForTaskId()
@@ -713,7 +607,14 @@ public class LeadServiceImpl implements LeadService {
                 LocalDateTime.now()
         );
 
-        return toResponse(assignment);
+        assignment.setModifiedById(101L);
+
+        LeadAssignment updatedAssignment =
+                leadAssignmentRepository.save(
+                        assignment
+                );
+
+        return toResponse(updatedAssignment);
     }
 
 
@@ -722,83 +623,74 @@ public class LeadServiceImpl implements LeadService {
     // =========================================================
 
     @Override
-    public void deleteAssignment(Long assignmentId) {
+    @Transactional
+    public void deleteAssignment(
+            Long assignmentId) {
 
         LeadAssignment assignment =
-                LeadAssignmentMockData.getAssignments()
-                        .stream()
-                        .filter(a ->
-                                a.getAssignmentId().equals(assignmentId))
-                        .findFirst()
-                        .orElseThrow(() ->
-                                new RuntimeException(
-                                        "Lead assignment not found: "
-                                                + assignmentId
-                                )
-                        );
+                findAssignment(assignmentId);
 
-        // Soft delete
+        /*
+         * Soft delete.
+         */
         assignment.setIsDeleted(true);
+
         assignment.setIsActive(false);
-        assignment.setModifiedAt(LocalDateTime.now());
+
+        assignment.setModifiedAt(
+                LocalDateTime.now()
+        );
+
+        assignment.setModifiedById(101L);
+
+        leadAssignmentRepository.save(
+                assignment
+        );
     }
 
 
     // =========================================================
-    // CONVERT MODEL → RESPONSE DTO
+    // FIND ASSIGNMENT
+    // =========================================================
+
+    private LeadAssignment findAssignment(
+            Long assignmentId) {
+
+        return leadAssignmentRepository
+                .findById(assignmentId)
+                .orElseThrow(
+                        () -> new RuntimeException(
+                                "Lead assignment not found: "
+                                        + assignmentId
+                        )
+                );
+    }
+
+
+    // =========================================================
+    // CONVERT MODEL -> RESPONSE DTO
     // =========================================================
 
     private LeadAssignmentResponse toResponse(
             LeadAssignment assignment) {
 
         return new LeadAssignmentResponse(
-
                 assignment.getAssignmentId(),
-
                 assignment.getLeadId(),
-
                 assignment.getAssignedForTaskId(),
-
                 assignment.getAssignmentStatus(),
-
                 assignment.getAssignmentRemark(),
-
                 assignment.getProceedToId(),
-
                 assignment.getIsTerminal(),
-
                 assignment.getIsActive(),
-
                 assignment.getCreatedAt(),
-
                 assignment.getModifiedAt(),
-
                 assignment.getVerifiedAt(),
-
                 assignment.getCreatedById(),
-
                 assignment.getModifiedById(),
-
                 assignment.getVerifiedById(),
-
                 assignment.getVerificationMode(),
-
                 assignment.getIsDeleted()
         );
-    }
-
-
-    // =========================================================
-    // GENERATE MOCK ASSIGNMENT ID
-    // =========================================================
-
-    private Long generateAssignmentId() {
-
-        return LeadAssignmentMockData
-                .getAssignments()
-                .stream()
-                .mapToLong(LeadAssignment::getAssignmentId)
-                .max()
-                .orElse(5000L) + 1;
     }
 }

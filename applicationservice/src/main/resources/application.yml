@@ -1,4 +1,27 @@
 spring:
+  # =========================
+  # PostgreSQL
+  # =========================
+  datasource:
+    url: jdbc:postgresql://localhost:5432/lossystem
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+
+  # =========================
+  # JPA / Hibernate
+  # =========================
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+  # =========================
+  # Kafka
+  # =========================
   kafka:
     bootstrap-servers: localhost:9092
 
@@ -14,6 +37,7 @@ spring:
       properties:
         spring.json.trusted.packages: "*"
         spring.json.use.type.headers: false
+
 server:
   port: 8082
 
