@@ -2,33 +2,28 @@ package com.los.documentservice.service.serviceImpl;
 
 import com.los.documentservice.dto.DocumentTypeMasterRequest;
 import com.los.documentservice.dto.DocumentTypeMasterResponse;
-import com.los.documentservice.mock.DocumentTypeMasterMockData;
+import com.los.documentservice.exception.ResourceNotFoundException;
 import com.los.documentservice.model.DocumentTypeMaster;
+import com.los.documentservice.repository.DocumentTypeMasterRepository;
 import com.los.documentservice.service.DocumentTypeMasterService;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicLong;
 
 @Service
 public class DocumentTypeMasterServiceImpl implements DocumentTypeMasterService {
 
-    private final List<DocumentTypeMaster> documentTypes = new ArrayList<>();
-    private final AtomicLong nextId = new AtomicLong(1);
+    private final DocumentTypeMasterRepository documentTypeRepository;
 
-    public DocumentTypeMasterServiceImpl() {
-        DocumentTypeMasterMockData.getDocumentTypes().forEach(documentType -> {
-            documentType.setDocumentTypeId(nextId.getAndIncrement());
-            documentTypes.add(documentType);
-        });
+    public DocumentTypeMasterServiceImpl(DocumentTypeMasterRepository documentTypeRepository) {
+        this.documentTypeRepository = documentTypeRepository;
     }
 
     @Override
     public List<DocumentTypeMasterResponse> getAllDocumentTypes() {
-        return documentTypes.stream()
-                .filter(documentType -> !Boolean.TRUE.equals(documentType.getIsDeleted()))
+        return documentTypeRepository.findAllByIsDeletedFalse().stream()
                 .map(this::mapToResponse)
                 .toList();
     }
@@ -40,9 +35,9 @@ public class DocumentTypeMasterServiceImpl implements DocumentTypeMasterService 
     }
 
     @Override
-    public synchronized DocumentTypeMasterResponse createDocumentType(DocumentTypeMasterRequest request) {
+    @Transactional
+    public DocumentTypeMasterResponse createDocumentType(DocumentTypeMasterRequest request) {
         DocumentTypeMaster documentType = new DocumentTypeMaster();
-        documentType.setDocumentTypeId(nextId.getAndIncrement());
         documentType.setDocumentName(request.getDocumentName());
         documentType.setCategory(request.getCategory());
         documentType.setIsPoi(request.getIsPoi());
@@ -55,12 +50,12 @@ public class DocumentTypeMasterServiceImpl implements DocumentTypeMasterService 
         documentType.setModifiedBy(request.getCreatedBy());
         documentType.setIsDeleted(false);
 
-        documentTypes.add(documentType);
-        return mapToResponse(documentType);
+        return mapToResponse(documentTypeRepository.save(documentType));
     }
 
     @Override
-    public synchronized DocumentTypeMasterResponse updateDocumentType(Long documentTypeId, DocumentTypeMasterRequest request) {
+    @Transactional
+    public DocumentTypeMasterResponse updateDocumentType(Long documentTypeId, DocumentTypeMasterRequest request) {
         DocumentTypeMaster documentType = findDocumentType(documentTypeId);
         documentType.setDocumentName(request.getDocumentName());
         documentType.setCategory(request.getCategory());
@@ -70,23 +65,22 @@ public class DocumentTypeMasterServiceImpl implements DocumentTypeMasterService 
         documentType.setIsActive(request.getIsActive());
         documentType.setModifiedAt(LocalDateTime.now());
         documentType.setModifiedBy(request.getModifiedBy() != null ? request.getModifiedBy() : request.getCreatedBy());
-        return mapToResponse(documentType);
+        return mapToResponse(documentTypeRepository.save(documentType));
     }
 
     @Override
-    public synchronized void deleteDocumentType(Long documentTypeId) {
+    @Transactional
+    public void deleteDocumentType(Long documentTypeId) {
         DocumentTypeMaster documentType = findDocumentType(documentTypeId);
         documentType.setIsDeleted(true);
         documentType.setIsActive(false);
         documentType.setModifiedAt(LocalDateTime.now());
+        documentTypeRepository.save(documentType);
     }
 
     private DocumentTypeMaster findDocumentType(Long documentTypeId) {
-        return documentTypes.stream()
-                .filter(documentType -> documentTypeId.equals(documentType.getDocumentTypeId()))
-                .filter(documentType -> !Boolean.TRUE.equals(documentType.getIsDeleted()))
-                .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("Document type not found: " + documentTypeId));
+        return documentTypeRepository.findByDocumentTypeIdAndIsDeletedFalse(documentTypeId)
+                .orElseThrow(() -> new ResourceNotFoundException("Document type not found: " + documentTypeId));
     }
 
     private DocumentTypeMasterResponse mapToResponse(DocumentTypeMaster documentType) {

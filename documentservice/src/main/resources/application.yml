@@ -1,6 +1,26 @@
 spring:
   application:
     name: documentservice
+  config:
+    import: optional:file:.env[.properties],optional:file:documentservice/.env[.properties]
+  datasource:
+    url: ${DOCUMENT_DB_URL:jdbc:postgresql://localhost:5432/documentdb}
+    username: ${DOCUMENT_DB_USERNAME:documentuser}
+    password: ${DOCUMENT_DB_PASSWORD:Shri@1927}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+  servlet:
+    multipart:
+      max-file-size: ${DOCUMENT_MAX_FILE_SIZE:20MB}
+      max-request-size: ${DOCUMENT_MAX_REQUEST_SIZE:25MB}
 server:
   port: 8083
 
